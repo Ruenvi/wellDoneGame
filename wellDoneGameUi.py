@@ -222,9 +222,11 @@ class GameWidget(QtWidgets.QWidget):
                 # ถ้าอยู่ใกล้ถังขยะ → ทิ้งของ
                 if wdutil.is_near_trash(self):
                     wdutil.try_throw_item_to_trash(self)
+                else:
+                    wdutil.drop_item(self)
 
                 # ถ้าอยู่ใกล้จาน → ใส่วัตถุดิบลงจาน
-                elif wdutil.is_near_plate(self):
+                elif any(wdutil.is_near_object(self.chef, plate)for plate in self.dropped_plates):    
                     wdutil.add_item_to_plate(self, self.current_item)
                     # ล้างของในมือ
                     self.has_item = False
@@ -288,6 +290,9 @@ class GameWidget(QtWidgets.QWidget):
             icon_x = new_x + (self.chef.width() - self.held_icon.width()) // 2
             icon_y = new_y - self.held_icon.height() - 5
             self.held_icon.move(icon_x, icon_y)
+
+        if getattr(self, "has_plate", False) and hasattr(self, "held_plate"):
+            wdutil.update_plate_position(self, self.chef, self.held_plate)
 
 
 class Overlay(QtWidgets.QWidget):

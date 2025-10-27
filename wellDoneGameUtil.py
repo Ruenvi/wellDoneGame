@@ -101,46 +101,71 @@ def update_held_icon_position(game_widget):
 
 # ------------------- วางของ -------------------
 def drop_item(game_widget):
+    """ฟังก์ชันวางของจากมือเชฟลงในจุดต่าง ๆ (เขียง, หม้อ, พื้น, ถังขยะ)"""
     if not getattr(game_widget, "has_item", False):
+        print("❌ ไม่มีของในมือ")
         return
 
-    drop_x = game_widget.chef.x() + (game_widget.chef.width() - 40) // 2  # 40 = ขนาด icon
-    drop_y = game_widget.chef.y() + game_widget.chef.height() - 10
     item_name = game_widget.current_item
 
+    # ✅ ถ้าอยู่ใกล้ถังขยะ → ทิ้งของ
+    if wdutil.is_near_trash(game_widget):
+        wdutil.try_throw_item_to_trash(game_widget)
+        return
+
+    # --- ตรวจสอบว่ามี object จำเป็นหรือไม่ ---
+    if not hasattr(game_widget, "chef"):
+        print("⚠️ ไม่มี chef ในเกม")
+        return
+
+    # --- เตรียมตำแหน่งวาง ---
+    drop_x = game_widget.chef.x() + (game_widget.chef.width() - 40) // 2
+    drop_y = game_widget.chef.y() + game_widget.chef.height() - 10
+
+    # --- สร้าง QLabel แสดงของ ---
     item_label = QtWidgets.QLabel(game_widget)
     pix_path = os.path.join(SOURCE_PATH, "image", f"{item_name}_icon.png")
+    if not os.path.exists(pix_path):
+        print(f"⚠️ ไม่พบภาพ: {pix_path}")
+        return
+
     pix = QtGui.QPixmap(pix_path)
     item_label.setPixmap(pix)
     item_label.setScaledContents(True)
     item_label.resize(40, 40)
     item_label.move(drop_x, drop_y)
-
     item_label.setAttribute(QtCore.Qt.WA_TranslucentBackground)
     item_label.setStyleSheet("background: transparent;")
-
     item_label.show()
 
+    # --- คำนวณตำแหน่งศูนย์กลางของเชฟ ---
     chef_center = QtCore.QPoint(
         game_widget.chef.x() + game_widget.chef.width() // 2,
         game_widget.chef.y() + game_widget.chef.height() // 2
     )
 
-    # --- chopping board ---
-    board_geom = game_widget.chopping_board.geometry()
-    board_center = QtCore.QPoint(
-        board_geom.x() + board_geom.width() // 2,
-        board_geom.y() + board_geom.height() // 2
-    )
-    dx = chef_center.x() - board_center.x()
-    dy = chef_center.y() - board_center.y()
-    distance_board = (dx**2 + dy**2) ** 0.5
+    placed = False  # flag ตรวจว่าของถูกวางตรงไหนแล้วหรือยัง
 
-    if distance_board <= 50:
-        game_widget.chopping_board_icons.append(item_label)
-        print(f"วาง {item_name} บน chopping board")
-    else:
-        # --- pot ---
+    # 🪵 เขียง (chopping board)
+    if hasattr(game_widget, "chopping_board"):
+        board_geom = game_widget.chopping_board.geometry()
+        board_center = QtCore.QPoint(
+            board_geom.x() + board_geom.width() // 2,
+            board_geom.y() + board_geom.height() // 2
+        )
+        dx = chef_center.x() - board_center.x()
+        dy = chef_center.y() - board_center.y()
+        distance_board = (dx ** 2 + dy ** 2) ** 0.5
+
+        if distance_board <= 50:
+            if not hasattr(game_widget, "chopping_board_icons"):
+                game_widget.chopping_board_icons = []
+            game_widget.chopping_board_icons.append(item_label)
+            print(f"🔪 วาง {item_name} บน chopping board")
+            placed = True
+
+    # 🍲 หม้อ (pot)
+    if not placed and hasattr(game_widget, "pot"):
         pot_geom = game_widget.pot.geometry()
         pot_center = QtCore.QPoint(
             pot_geom.x() + pot_geom.width() // 2,
@@ -148,33 +173,44 @@ def drop_item(game_widget):
         )
         dx = chef_center.x() - pot_center.x()
         dy = chef_center.y() - pot_center.y()
-        distance_pot = (dx**2 + dy**2) ** 0.5
+        distance_pot = (dx ** 2 + dy ** 2) ** 0.5
 
         if distance_pot <= 50:
-            game_widget.pot_icons.append(item_label)
+            if not hasattr(game_widget, "pot_icons"):
+                game_widget.pot_icons = []
             if not hasattr(game_widget, "pot_contents"):
                 game_widget.pot_contents = []
+
+            game_widget.pot_icons.append(item_label)
             game_widget.pot_contents.append(item_name)
-            print(f"วาง {item_name} ลง pot")
+            print(f"🥘 วาง {item_name} ลงหม้อ")
 
             count = game_widget.pot_contents.count(item_name)
             if count == 3:
-                print(f"🎉 ต้มเสร็จ: {item_name.replace('_chopped','')}")
+                print(f"🎉 {item_name.replace('_chopped', '')} ต้มเสร็จแล้ว!")
                 for _ in range(3):
                     game_widget.pot_contents.remove(item_name)
                 for icon in game_widget.pot_icons[:3]:
                     icon.deleteLater()
                     game_widget.pot_icons.remove(icon)
-        else:
-            print(f"วาง {item_name} บนพื้น")
-            item_label.item_name = item_name 
-            game_widget.placed_items.append(item_label)
+            placed = True
 
+    # 🌾 ถ้าไม่อยู่ใกล้ที่ไหนเลย → วางบนพื้น
+    if not placed:
+        print(f"📦 วาง {item_name} บนพื้น")
+        item_label.item_name = item_name
+        if not hasattr(game_widget, "placed_items"):
+            game_widget.placed_items = []
+        game_widget.placed_items.append(item_label)
+
+    # 🧺 ล้างของในมือเชฟ
     if getattr(game_widget, "held_icon", None):
         game_widget.held_icon.deleteLater()
         game_widget.held_icon = None
+
     game_widget.has_item = False
     game_widget.current_item = None
+
 
 # ------------------- หั่น -------------------
 def process_space_action(game_widget):
@@ -302,43 +338,110 @@ def update_plate_image(game_widget, target_label=None, items=None):
     target_label.setPixmap(pix)
     target_label.setScaledContents(True)
 
-
 def try_pickup_plate(game_widget):
-    """พยายามหยิบจานจาก plate_station"""
-    if not hasattr(game_widget, "plate_station"):
-        print("❌ ยังไม่มี plate_station ใน scene")
+    """ฟังก์ชันให้เชฟหยิบจานจาก station หรือจากพื้น (พร้อมของบนจาน)"""
+    # 🧺 ถ้ามือเชฟถือของอื่นอยู่ หยุดเลย
+    if getattr(game_widget, "has_item", False):
+        print("เชฟถือของอยู่แล้ว 🧺")
         return
 
-    # ตรวจระยะ (ใช้ bounding box)
-    if not is_near_object(game_widget.chef, game_widget.plate_station, mode="bounds"):
-        print("❌ ยังอยู่ไกลจาก plate_station")
+    # 🔸 ลบจานเก่าถ้ามี
+    if hasattr(game_widget, "held_plate") and game_widget.held_plate:
+        game_widget.held_plate.deleteLater()
+        game_widget.held_plate = None
+
+    # 📍 หาตำแหน่งศูนย์กลางเชฟ
+    chef_geom = game_widget.chef.geometry()
+    chef_center = QtCore.QPoint(
+        chef_geom.x() + chef_geom.width() // 2,
+        chef_geom.y() + chef_geom.height() // 2
+    )
+
+    threshold = getattr(game_widget, "pickup_threshold", 80)
+
+    # 1️⃣ ตรวจว่าใกล้ plate_station หรือไม่
+    if hasattr(game_widget, "plate_station") and is_near_object(game_widget.chef, game_widget.plate_station, mode="bounds"):
+        if getattr(game_widget, "has_plate", False):
+            print("⚠️ มีจานอยู่แล้ว")
+            return
+
+        # ✅ หยิบจานใหม่จาก station
+        game_widget.has_plate = True
+        game_widget.current_item = "plate"
+        game_widget.plate_items = []
+
+        held_plate = QtWidgets.QLabel(game_widget)
+        img_path = os.path.join(SOURCE_PATH, "image", "plate.png")
+        if os.path.exists(img_path):
+            held_plate.setPixmap(QtGui.QPixmap(img_path))
+        held_plate.setScaledContents(True)
+        held_plate.resize(64, 64)
+        held_plate.setStyleSheet("background: transparent;")
+        held_plate.show()
+
+        update_plate_position(game_widget, game_widget.chef, held_plate)
+        game_widget.held_plate = held_plate
+
+        print("✅ หยิบจานเรียบร้อย!")
         return
 
-    # ตรวจว่าถือจานอยู่แล้วไหม
-    if getattr(game_widget, "has_plate", False):
-        print("⚠️ มีจานอยู่แล้ว")
-        return
+    # 2️⃣ ตรวจ dropped_plates (จานที่วางพื้น)
+    if hasattr(game_widget, "dropped_plates"):
+        for plate_dict in list(game_widget.dropped_plates):
+            lbl = plate_dict.get("label")
+            items_on_plate = plate_dict.get("items", [])
 
-    # ✅ หยิบจาน
-    game_widget.has_plate = True
-    game_widget.current_item = "plate"
-    game_widget.plate_items = []
+            if lbl is None:
+                continue
 
-    # --- สร้าง QLabel สำหรับจาน ---
-    held_plate = QtWidgets.QLabel(game_widget)
-    held_plate.setPixmap(QtGui.QPixmap(os.path.join(SOURCE_PATH, "image", "plate.png")))
-    held_plate.setScaledContents(True)
-    held_plate.resize(64, 64)
-    held_plate.setStyleSheet("background: transparent;")
-    held_plate.show()
+            # หาระยะระหว่างเชฟกับจาน
+            item_geom = lbl.geometry()
+            item_center = QtCore.QPoint(
+                item_geom.x() + item_geom.width() // 2,
+                item_geom.y() + item_geom.height() // 2
+            )
+            dx = chef_center.x() - item_center.x()
+            dy = chef_center.y() - item_center.y()
+            distance = (dx**2 + dy**2) ** 0.5
 
-    # --- จัดตำแหน่งให้อยู่บนหัวเชฟ ---
-    chef = game_widget.chef
-    update_plate_position(game_widget, chef, held_plate)
+            # 📏 ถ้าอยู่ในระยะหยิบได้
+            if distance <= threshold:
+                # ✅ หยิบทั้งจานและของทั้งหมด
+                game_widget.has_plate = True
+                game_widget.current_item = "plate"
+                game_widget.plate_items = list(items_on_plate)
 
-    game_widget.held_plate = held_plate
+                # --- 🔹 สร้าง QLabel ของจานที่ถือ ---
+                held_plate = QtWidgets.QLabel(game_widget)
+                img_path = os.path.join(SOURCE_PATH, "image", "plate_icon.png")
+                if os.path.exists(img_path):
+                    held_plate.setPixmap(QtGui.QPixmap(img_path))
+                held_plate.setScaledContents(True)
+                held_plate.resize(64, 64)
+                held_plate.setStyleSheet("background: transparent;")
+                held_plate.show()
 
-    print("✅ หยิบจานเรียบร้อย!")
+                # --- จัดตำแหน่งให้อยู่บนหัวเชฟ ---
+                update_plate_position(game_widget, game_widget.chef, held_plate)
+                game_widget.held_plate = held_plate
+
+                # --- อัปเดตรูปให้เห็นของทั้งหมดบนจาน ---
+                try:
+                    update_plate_image(game_widget, target_label=held_plate, items=game_widget.plate_items)
+                except Exception:
+                    pass
+
+                # --- ลบจานจากพื้น ---
+                lbl.deleteLater()
+                try:
+                    game_widget.dropped_plates.remove(plate_dict)
+                except ValueError:
+                    pass
+
+                print(f"✅ หยิบจานพร้อมของทั้งหมดจากพื้น: {game_widget.plate_items}")
+                return
+
+    print("❌ ไม่ได้อยู่ใกล้วัตถุดิบใด ๆ")
 
 
 def is_near_object(obj_a, obj_b, threshold=80, mode="center"):
@@ -413,6 +516,32 @@ def drop_plate(game_widget):
 
     print("🧺 วางจานลงพื้นแล้ว")
 
+def is_near_trash(game_widget, threshold=80):
+    """
+    ตรวจสอบว่าเชฟอยู่ใกล้ถังขยะหรือไม่
+    return: True ถ้าอยู่ในระยะ threshold, False ถ้าไกลเกินไป
+    """
+    if not hasattr(game_widget, "trash_bin") or game_widget.trash_bin is None:
+        print("⚠️ ไม่มี trash_bin ในเกม")
+        return False
+
+    chef_geom = game_widget.chef.geometry()
+    trash_geom = game_widget.trash_bin.geometry()
+
+    chef_center = QtCore.QPoint(
+        chef_geom.x() + chef_geom.width() // 2,
+        chef_geom.y() + chef_geom.height() // 2
+    )
+    trash_center = QtCore.QPoint(
+        trash_geom.x() + trash_geom.width() // 2,
+        trash_geom.y() + trash_geom.height() // 2
+    )
+
+    dx = chef_center.x() - trash_center.x()
+    dy = chef_center.y() - trash_center.y()
+    distance = (dx ** 2 + dy ** 2) ** 0.5
+
+    return distance <= threshold
 
 def throw_plate_to_trash(game_widget):
     """ทิ้งจานในถังขยะ"""
@@ -423,22 +552,7 @@ def throw_plate_to_trash(game_widget):
         print("❌ ไม่มี trash_bin ในเกม")
         return
 
-    # ตรวจระยะระหว่างเชฟกับถังขยะ
-    chef_center = QtCore.QPoint(
-        game_widget.chef.x() + game_widget.chef.width() // 2,
-        game_widget.chef.y() + game_widget.chef.height() // 2
-    )
-    trash_geom = game_widget.trash_bin.geometry()
-    trash_center = QtCore.QPoint(
-        trash_geom.x() + trash_geom.width() // 2,
-        trash_geom.y() + trash_geom.height() // 2
-    )
-
-    dx = chef_center.x() - trash_center.x()
-    dy = chef_center.y() - trash_center.y()
-    distance = (dx**2 + dy**2) ** 0.5
-
-    if distance > 80:
+    if not is_near_trash(game_widget):
         print("🚫 อยู่ไกลเกินไปจากถังขยะ")
         return
 
