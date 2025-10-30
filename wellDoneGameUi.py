@@ -338,7 +338,7 @@ class GameWidget(QtWidgets.QWidget):
         self.chef.setScaledContents(True)
         self.chef.resize(111.875, 133.33)
         self.chef.move(200, 200)
-        self.chef_speed = 8
+        self.chef_speed = 10
 
 
         # ตัวจับเวลาเดินอัตโนมัติ

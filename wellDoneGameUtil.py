@@ -1144,17 +1144,28 @@ def try_cook_pot(game_widget):
         # สร้างไอคอนซุปบนหม้อ
         pot_geom = game_widget.pot.geometry()
         pot_pos = game_widget.pot.mapToParent(QtCore.QPoint(0, 0))
+
+        # สร้าง QLabel สำหรับซุป
         soup_lbl = QtWidgets.QLabel(game_widget)
-        soup_path = os.path.join(SOURCE_PATH, 'image', f'plate_{soup_name}.png')
-        if not os.path.exists(soup_path):
-            # ถ้าไม่มีไอคอนแบบ plate_<soup>_icon.png ให้ลองชื่ออื่น
-            soup_path = os.path.join(SOURCE_PATH, 'image', f'{soup_name}.png')
+
+        # โหลด PNG (โปร่งใส)
+        soup_path = os.path.join(SOURCE_PATH, 'image', f'{soup_name}.png')
         pix = QtGui.QPixmap(soup_path) if os.path.exists(soup_path) else QtGui.QPixmap()
+        soup_lbl.setAttribute(QtCore.Qt.WA_TranslucentBackground)
         soup_lbl.setPixmap(pix)
+
+        # ตั้งค่าให้ QLabel รองรับการปรับขนาด
         soup_lbl.setScaledContents(True)
         soup_lbl.resize(48, 48)
-        soup_lbl.move(pot_pos.x() + (pot_geom.width() - 48) // 2, pot_pos.y() - 40)
+
+        # วางตรงกลางหม้อ และยกขึ้นเล็กน้อย
+        soup_lbl.move(
+            pot_pos.x() + (pot_geom.width() - 48) // 2,
+            pot_pos.y() - 40
+        )
+
         soup_lbl.show()
+
         game_widget.soup_icon = soup_lbl
         print(f'🍲 ต้มเสร็จแล้ว: {soup_name} (created soup_icon)')
 
@@ -1178,11 +1189,12 @@ def _create_invisible_walls(self):
         QtCore.QRect(65, 290, 80, 110),
         QtCore.QRect(195, 80, 355, 65),
         QtCore.QRect(715, 80, 260, 65),
-        QtCore.QRect(195, 460, 355, 65)
+        QtCore.QRect(195, 480, 355, 50)
     ]
     for rect in zones:
         box = QtWidgets.QFrame(self)
         box.setGeometry(rect)
+        #box.setStyleSheet("background-color: rgba(255, 0, 0, 100); border: 1px solid red;")
         box.setStyleSheet("background: transparent;")
         box.hide()
         self.obstacles.append(box)
