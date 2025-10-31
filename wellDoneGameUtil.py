@@ -59,7 +59,11 @@ def try_pick_item(game_widget, threshold=80):  # เพิ่มระยะก�
         if distance <= threshold:
             game_widget.has_item = True
             game_widget.current_item = name
-            print(f'✅ หยิบวัตถุดิบ: {name}')
+            pick_msg = f'หยิบ {name} ✅'
+            print(pick_msg)
+            game_page = getattr(game_widget, 'game_page', None)
+            if game_page and hasattr(game_page, 'show_toast'):
+                game_page.show_toast(pick_msg)
             show_pick_feedback(game_widget, name)
             found = True
             break
@@ -195,7 +199,7 @@ def try_pick_item(game_widget, threshold=80):  # เพิ่มระยะก�
 
 
     if not found:
-        print("❌ ไม่ได้อยู่ใกล้วัตถุดิบใด ๆ")
+        print("ไม่มีวัตถุดิบใกล้ตัว")
 
 # ------------------- icon ติดตามเชฟ -------------------
 def show_pick_feedback(game_widget, item_name):
@@ -382,6 +386,17 @@ def drop_item(game_widget):
         game_widget.held_icon.deleteLater()
         game_widget.held_icon = None
 
+    # แจ้งเตือนการวางของ
+    drop_msg = ''
+    if placed == 'chopping_board':
+        drop_msg = f'วาง {item_name} บนเขียง 🔪'
+    elif placed == 'pot':
+        drop_msg = f'ใส่ {item_name} ลงหม้อ 🥘'
+    else:
+        drop_msg = f'วาง {item_name} ลงพื้น 📦'
+        
+    print(drop_msg)
+        
     game_widget.has_item = False
     game_widget.current_item = None
 
@@ -418,9 +433,16 @@ def process_space_action(game_widget):
             icon_label.move(game_widget.chopping_board.x(), game_widget.chopping_board.y())
             print(f'✅ หั่นวัตถุดิบเสร็จ: {chopped_name}')
 
-        # กำหนด delay 3000 ms (3 วินาที)
-        QtCore.QTimer.singleShot(3000, finish_chop)
-        print(f'⏳ เริ่มหั่นวัตถุดิบ: {item_name}')
+        # แสดง toast ว่ากำลังหั่น
+    try:
+        if hasattr(game_widget, 'game_page') and game_widget.game_page:
+            game_widget.game_page.show_toast(f'กำลังหั่น {item_name}... ⌛', duration=3000)
+    except Exception as e:
+        print(f"❌ ไม่สามารถแสดง toast ได้: {e}")
+
+    # กำหนด delay 3000 ms (3 วินาที)
+    QtCore.QTimer.singleShot(3000, finish_chop)
+    print(f'⏳ เริ่มหั่นวัตถุดิบ: {item_name}')
 
 # ------------------- ทิ้งของลงถังขยะ ------------------
 
@@ -526,7 +548,14 @@ def add_item_to_plate(game_widget, item_name):
     if not hasattr(game_widget, 'plate_items'):
         game_widget.plate_items = []
     game_widget.plate_items.append(item_name)
-    print(f'🍽️ ใส่ {item_name} ลงจาน')
+    add_msg = f'ใส่ {item_name} ลงจาน 🍽️'
+    print(add_msg)
+    try:
+        if hasattr(game_widget, 'game_page') and game_widget.game_page:
+            game_widget.game_page.show_toast(add_msg)
+            print("✅ แสดง toast: " + add_msg)
+    except Exception as e:
+        print(f"❌ ไม่สามารถแสดง toast ได้: {e}")
 
     update_plate_image(game_widget)
 
@@ -866,7 +895,11 @@ def drop_plate(game_widget):
         game_widget.held_plate.deleteLater()
         game_widget.held_plate = None
 
-    print('🧺 วางจานลงพื้นแล้ว')
+    drop_msg = 'วางจานลงพื้น 🧺'
+    print(drop_msg)
+    game_page = getattr(game_widget, 'game_page', None)
+    if game_page and hasattr(game_page, 'show_toast'):
+        game_page.show_toast(drop_msg)
 
 def is_near_trash(game_widget, threshold=40):
     """
@@ -942,7 +975,14 @@ def try_serve_plate(game_widget, threshold=80):
     distance = (dx**2 + dy**2) ** 0.5
 
     if distance > threshold:
-        print('🚫 ยังไม่อยู่ใกล้จุดเสิร์ฟพอ')
+        far_msg = 'ยังไม่ใกล้จุดเสิร์ฟ 🚫'
+        print(far_msg)
+        try:
+            if game_page and hasattr(game_page, 'show_toast'):
+                game_page.show_toast(far_msg, duration=3000)
+                print("✅ แสดง toast ระยะห่าง")
+        except Exception as e:
+            print(f"❌ Error showing toast: {e}")
         return False
 
     # หา game_page ถ้า GameWidget ถูกเชื่อมไว้
@@ -997,7 +1037,14 @@ def try_serve_plate(game_widget, threshold=80):
 
         if in_orders:
             score = score_dict.get(meal_name, 0)
-            print(f'✅ เสิร์ฟ {meal_name} ถูกต้อง +{score} คะแนน')
+            success_msg = f'เสิร์ฟ {meal_name} ถูกต้อง +{score} คะแนน ✅'
+            print(success_msg)
+            try:
+                if game_page and hasattr(game_page, 'show_toast'):
+                    game_page.show_toast(success_msg, duration=4000)
+                    print("✅ แสดง toast เสิร์ฟสำเร็จ")
+            except Exception as e:
+                print(f"❌ Error showing toast: {e}")
             spawn_served_object(meal_name, spacing=3.0)
             # อัปเดต authoritative orders ถ้าเป็น GamePage
             if game_page is not None and hasattr(game_page, 'serve_dish_to_order'):
@@ -1018,7 +1065,14 @@ def try_serve_plate(game_widget, threshold=80):
                     pass
             return score
         else:
-            print(f'⚠️ เสิร์ฟ {meal_name} แต่ไม่ตรงกับออร์เดอร์ ❌ (-5)')
+            fail_msg = f'เสิร์ฟ {meal_name} ไม่ตรงออร์เดอร์ ❌ (-5)'
+            print(f'⚠️ {fail_msg}')
+            try:
+                if game_page and hasattr(game_page, 'show_toast'):
+                    game_page.show_toast(fail_msg, duration=4000)
+                    print("✅ แสดง toast เสิร์ฟผิด")
+            except Exception as e:
+                print(f"❌ Error showing toast: {e}")
             return -5
 
     def update_score(amount):
@@ -1173,10 +1227,14 @@ def try_cook_pot(game_widget):
     # รอ 2 วินาทีแล้วค่อยทำซุป
     QtCore.QTimer.singleShot(4000, cook_finish)
     print('⏳ เริ่มต้มซุป... (2 วินาที)')
+    if hasattr(game_widget, 'game_page') and game_widget.game_page:
+        game_widget.game_page.show_toast('⏳ เริ่มต้มซุป... (4 วินาที)')
     return True
     game_widget.soup_icon = soup_lbl
 
     print(f'🍲 ต้มเสร็จแล้ว: {soup_name} (created soup_icon)')
+    if hasattr(game_widget, 'game_page') and game_widget.game_page:
+        game_widget.game_page.show_toast(f'🍲 ต้มเสร็จแล้ว: {soup_name}')
     return True
 
 """------------Invisible Colliders-----------"""
@@ -1210,16 +1268,18 @@ def _can_move_to(self, new_x, new_y):
 def spawn_served_object(menu_name, spacing=3.0, row_spacing=3.0):
 
     menu_to_object = {
-        "tomato_soup": "sphere",
-        "lettuce_salad": "cube",
-        "lettuce_tomato_salad": "cylinder",
-        "delux_salad": "cone"
+        "tomato_soup": "sphere",             # ซุปมะเขือเทศ -> ทรงกลม
+        "lettuce_salad": "cube",             # สลัดผัก -> ทรงสี่เหลี่ยม
+        "tomato_lettuce_salad": "cylinder",  # สลัดมะเขือเทศ -> ทรงกระบอก
+        "delux_salad": "cone",               # สลัดรวม -> ทรงกรวย
+        "lettuce_tomato_salad": "cylinder"   # สลัดมะเขือผัด -> ทรงกระบอก
     }
 
     menu_to_row = {
         "tomato_soup": 0,
         "lettuce_salad": 1,
-        "lettuce_tomato_salad": 2,
+        "tomato_lettuce_salad": 2,
+        "lettuce_tomato_salad": 2,  # ใช้แถวเดียวกับ tomato_lettuce_salad
         "delux_salad": 3
     }
 

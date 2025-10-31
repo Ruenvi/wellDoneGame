@@ -308,6 +308,7 @@ class GameWidget(QtWidgets.QWidget):
         self.setFocusPolicy(QtCore.Qt.StrongFocus)
         self.setStyleSheet("background-color: #8BC34A;")  # สีพื้นสนาม
         self.objects = []
+        self.game_page = None  # เพิ่มตัวแปรสำหรับเก็บ reference ไปยัง GamePage
 
 
         # สร้างวัตถุในฉาก
@@ -646,11 +647,11 @@ class GamePage(QtWidgets.QWidget):
 
         self.game_widget = GameWidget()
         layout.addWidget(self.game_widget)
-        # ให้ GameWidget รู้จัก GamePage เพื่อให้การเสิร์ฟสามารถอัปเดต orders/score ได้
-        try:
-            self.game_widget.game_page = self
-        except Exception:
-            pass
+        
+        # เชื่อมต่อ GameWidget กับ GamePage เพื่อให้สามารถแสดง toast และอัปเดต orders/score ได้
+        self.game_widget.game_page = self
+        print("✅ GameWidget เชื่อมต่อกับ GamePage แล้ว")
+        
         self.game_widget.setFocus()
 
         # Score / Time / Orders labels (create early so helpers can use them)
@@ -990,11 +991,89 @@ class GamePage(QtWidgets.QWidget):
         self.overlay.hide()
         self.stacked_widget.setCurrentIndex(0)
 
+    def show_toast(self, message: str, duration: int = 3000, y_offset: int = -60):
+        """Show a transient floating message (toast) above the chef.
+
+        message: text to show
+        duration: milliseconds before fully faded
+        y_offset: vertical offset relative to chef (negative to show above)
+        """
+        try:
+            print(f"🔄 กำลังสร้าง toast: {message}")
+            
+            # create label with white border for better visibility
+            lbl = QtWidgets.QLabel(self)
+            lbl.setText(message)
+            lbl.setWordWrap(True)
+            lbl.setAlignment(QtCore.Qt.AlignCenter)
+            lbl.setStyleSheet("""
+                QLabel {
+                    background-color: rgba(0,0,0,200);
+                    color: #ffffff;
+                    border: 2px solid white;
+                    border-radius: 8px;
+                    padding: 8px 12px;
+                    font: bold 16px 'Arial';
+                }
+            """)
+            lbl.setAttribute(QtCore.Qt.WA_TranslucentBackground)
+            lbl.adjustSize()
+
+            # position above chef if possible
+            try:
+                chef = self.game_widget.chef
+                x = chef.x() + (chef.width() - lbl.width()) // 2
+                y = chef.y() + y_offset
+                print(f"✅ ตำแหน่ง toast: ({x}, {y})")
+            except Exception as e:
+                print(f"⚠️ ไม่สามารถหาตำแหน่งเชฟ: {e}")
+                x = (self.width() - lbl.width()) // 2
+                y = 50
+
+            # Ensure label stays within window bounds and on top
+            x = max(10, min(x, self.width() - lbl.width() - 10))
+            y = max(10, y)
+            lbl.move(x, y)
+            lbl.raise_()
+            lbl.show()
+
+            # Create opacity animation
+            effect = QtWidgets.QGraphicsOpacityEffect(lbl)
+            lbl.setGraphicsEffect(effect)
+            
+            fade_anim = QtCore.QPropertyAnimation(effect, b"opacity")
+            fade_anim.setStartValue(1.0)
+            fade_anim.setEndValue(0.0)
+            fade_anim.setDuration(duration)
+
+            # Create movement animation
+            move_anim = QtCore.QPropertyAnimation(lbl, b"pos")
+            move_anim.setStartValue(lbl.pos())
+            move_anim.setEndValue(QtCore.QPoint(x, y - 40))  # Move up more
+            move_anim.setDuration(duration)
+
+            # Create animation group
+            group = QtCore.QParallelAnimationGroup(lbl)
+            group.addAnimation(fade_anim)
+            group.addAnimation(move_anim)
+
+            # Keep reference and start
+            lbl._anim_group = group
+            group.start(QtCore.QAbstractAnimation.DeleteWhenStopped)
+
+            # Delete label after animation plus small delay
+            QtCore.QTimer.singleShot(duration + 100, lbl.deleteLater)
+            
+            print(f"✅ สร้าง toast สำเร็จ")
+            
+        except Exception as e:
+            print(f"❌ ไม่สามารถสร้าง toast ได้: {e}")
+
 class WellDoneGame(QtWidgets.QMainWindow):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Well Done! 🧑‍🍳")
-        self.resize(1200, 675)
+        self.resize(1200, 675)  
 
         self.stacked = QtWidgets.QStackedWidget()
         self.page1 = GameMenu(self.stacked)
