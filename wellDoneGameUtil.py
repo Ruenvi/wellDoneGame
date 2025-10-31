@@ -59,7 +59,7 @@ def try_pick_item(game_widget, threshold=80):  # เพิ่มระยะก�
         if distance <= threshold:
             game_widget.has_item = True
             game_widget.current_item = name
-            pick_msg = f'หยิบ {name} ✅'
+            pick_msg = f'pick {name} ✅'
             print(pick_msg)
             game_page = getattr(game_widget, 'game_page', None)
             if game_page and hasattr(game_page, 'show_toast'):
@@ -436,7 +436,7 @@ def process_space_action(game_widget):
         # แสดง toast ว่ากำลังหั่น
     try:
         if hasattr(game_widget, 'game_page') and game_widget.game_page:
-            game_widget.game_page.show_toast(f'กำลังหั่น {item_name}... ⌛', duration=3000)
+            game_widget.game_page.show_toast(f'chopping {item_name}... ⌛', duration=3000)
     except Exception as e:
         print(f"❌ ไม่สามารถแสดง toast ได้: {e}")
 
@@ -548,7 +548,7 @@ def add_item_to_plate(game_widget, item_name):
     if not hasattr(game_widget, 'plate_items'):
         game_widget.plate_items = []
     game_widget.plate_items.append(item_name)
-    add_msg = f'ใส่ {item_name} ลงจาน 🍽️'
+    add_msg = f'put {item_name} into plate 🍽️'
     print(add_msg)
     try:
         if hasattr(game_widget, 'game_page') and game_widget.game_page:
@@ -895,7 +895,7 @@ def drop_plate(game_widget):
         game_widget.held_plate.deleteLater()
         game_widget.held_plate = None
 
-    drop_msg = 'วางจานลงพื้น 🧺'
+    drop_msg = 'drop 🧺'
     print(drop_msg)
     game_page = getattr(game_widget, 'game_page', None)
     if game_page and hasattr(game_page, 'show_toast'):
@@ -1037,7 +1037,7 @@ def try_serve_plate(game_widget, threshold=80):
 
         if in_orders:
             score = score_dict.get(meal_name, 0)
-            success_msg = f'เสิร์ฟ {meal_name} ถูกต้อง +{score} คะแนน ✅'
+            success_msg = f'serve {meal_name} correct +{score} score ✅'
             print(success_msg)
             try:
                 if game_page and hasattr(game_page, 'show_toast'):
@@ -1065,7 +1065,7 @@ def try_serve_plate(game_widget, threshold=80):
                     pass
             return score
         else:
-            fail_msg = f'เสิร์ฟ {meal_name} ไม่ตรงออร์เดอร์ ❌ (-5)'
+            fail_msg = f'serve {meal_name} Not according to order ❌ (-5)'
             print(f'⚠️ {fail_msg}')
             try:
                 if game_page and hasattr(game_page, 'show_toast'):
@@ -1228,13 +1228,13 @@ def try_cook_pot(game_widget):
     QtCore.QTimer.singleShot(4000, cook_finish)
     print('⏳ เริ่มต้มซุป... (2 วินาที)')
     if hasattr(game_widget, 'game_page') and game_widget.game_page:
-        game_widget.game_page.show_toast('⏳ เริ่มต้มซุป... (4 วินาที)')
+        game_widget.game_page.show_toast('⏳ Start cooking... (4 s)')
     return True
     game_widget.soup_icon = soup_lbl
 
     print(f'🍲 ต้มเสร็จแล้ว: {soup_name} (created soup_icon)')
     if hasattr(game_widget, 'game_page') and game_widget.game_page:
-        game_widget.game_page.show_toast(f'🍲 ต้มเสร็จแล้ว: {soup_name}')
+        game_widget.game_page.show_toast(f'🍲 boiled already : {soup_name}')
     return True
 
 """------------Invisible Colliders-----------"""
@@ -1266,20 +1266,30 @@ def _can_move_to(self, new_x, new_y):
     return True
 
 def spawn_served_object(menu_name, spacing=3.0, row_spacing=3.0):
+    """
+    สร้าง object ตามชื่อเมนู และให้เลข index ต่อท้ายแบบไม่ซ้ำ
+    เช่น tomato_soup_1, tomato_soup_2, ... โดยไม่ให้ Maya สร้างชื่อซ้ำ (__1)
+    """
 
+    # -----------------------------
+    # Mapping เมนู → ประเภท object
+    # -----------------------------
     menu_to_object = {
-        "tomato_soup": "sphere",             # ซุปมะเขือเทศ -> ทรงกลม
-        "lettuce_salad": "cube",             # สลัดผัก -> ทรงสี่เหลี่ยม
-        "tomato_lettuce_salad": "cylinder",  # สลัดมะเขือเทศ -> ทรงกระบอก
-        "delux_salad": "cone",               # สลัดรวม -> ทรงกรวย
-        "lettuce_tomato_salad": "cylinder"   # สลัดมะเขือผัด -> ทรงกระบอก
+        "tomato_soup": "sphere",
+        "lettuce_salad": "cube",
+        "tomato_lettuce_salad": "cylinder",
+        "lettuce_tomato_salad": "cylinder",
+        "delux_salad": "cone"
     }
 
+    # -----------------------------
+    # Mapping เมนู → แถว (แนว Y)
+    # -----------------------------
     menu_to_row = {
         "tomato_soup": 0,
         "lettuce_salad": 1,
         "tomato_lettuce_salad": 2,
-        "lettuce_tomato_salad": 2,  # ใช้แถวเดียวกับ tomato_lettuce_salad
+        "lettuce_tomato_salad": 2,
         "delux_salad": 3
     }
 
@@ -1288,28 +1298,50 @@ def spawn_served_object(menu_name, spacing=3.0, row_spacing=3.0):
         return
 
     object_type = menu_to_object[menu_name]
-    row_index = menu_to_row.get(menu_name, 0)  # ถ้าไม่เจอให้เป็นแถวแรก
+    row_index = menu_to_row.get(menu_name, 0)
 
-    existing_objs = cmds.ls(f"{menu_name}_*")
-    next_index = len(existing_objs) + 1
+    # -----------------------------
+    # หา index ใหม่ที่ไม่ซ้ำ
+    # -----------------------------
+    base_name = menu_name
+    existing_objs = cmds.ls(f"{base_name}_*") or []
 
-    obj_name = f"{menu_name}_{next_index}"
+    # ดึงเฉพาะเลขท้ายที่มีอยู่แล้ว
+    existing_indices = []
+    for obj in existing_objs:
+        parts = obj.split('_')
+        if parts[-1].isdigit():
+            existing_indices.append(int(parts[-1]))
+    next_index = max(existing_indices) + 1 if existing_indices else 1
 
+    obj_name = f"{base_name}_{next_index}"
+
+    # -----------------------------
+    # สร้าง object (ไม่ให้ Maya auto-rename)
+    # -----------------------------
     if object_type == "sphere":
-        obj = cmds.polySphere(name=obj_name)[0]
+        obj = cmds.polySphere(name=obj_name, constructionHistory=False)[0]
     elif object_type == "cube":
-        obj = cmds.polyCube(name=obj_name)[0]
+        obj = cmds.polyCube(name=obj_name, constructionHistory=False)[0]
     elif object_type == "cylinder":
-        obj = cmds.polyCylinder(name=obj_name)[0]
+        obj = cmds.polyCylinder(name=obj_name, constructionHistory=False)[0]
     elif object_type == "cone":
-        obj = cmds.polyCone(name=obj_name)[0]
+        obj = cmds.polyCone(name=obj_name, constructionHistory=False)[0]
     else:
         cmds.warning(f"⚠️ ไม่รู้จัก object_type: {object_type}")
         return
 
+    # ถ้า Maya ยัง rename ให้ (กรณีหายาก) — บังคับ rename อีกครั้ง
+    if obj != obj_name:
+        cmds.rename(obj, obj_name)
+
+    # -----------------------------
+    # วางตำแหน่งใน viewport
+    # -----------------------------
     x_pos = (next_index - 1) * spacing
     y_pos = row_index * row_spacing
-    cmds.move(x_pos, y_pos, 0, obj, absolute=True)
+    cmds.move(x_pos, y_pos, 0, obj_name, absolute=True)
 
     print(f"✅ Created {obj_name} ({object_type}) at X={x_pos}, Y={y_pos}")
-    return obj
+    return obj_name
+

@@ -5,6 +5,7 @@ import importlib
 import sys, os
 import time
 import random
+import maya.cmds as cmds
 
 # Support running as a package (relative import) or as a standalone script
 try:
@@ -17,6 +18,20 @@ except Exception:
     pass
 
 SOURCE_PATH = os.path.join(os.path.dirname(__file__), "source_image", "image")
+FONT_PATH = os.path.join(os.path.dirname(__file__), "source_fonts", "SHOWG.ttf")
+
+if os.path.exists(FONT_PATH):
+    font_id = QtGui.QFontDatabase.addApplicationFont(FONT_PATH)
+    if font_id == -1:
+        print("⚠️ ไม่สามารถโหลดฟอนต์ได้:", FONT_PATH)
+        custom_font_family = None
+    else:
+        # ดึงชื่อฟอนต์จากไฟล์ (เช่น "Showcard Gothic")
+        Showcard_Gothic = QtGui.QFontDatabase.applicationFontFamilies(font_id)[0]
+        print(f"✅ Loaded custom font: {Showcard_Gothic}")
+else:
+    print("⚠️ ไม่พบไฟล์ฟอนต์:", FONT_PATH)
+    Showcard_Gothic = None
 
 class GameMenu(QtWidgets.QWidget):
     def __init__(self, stacked_widget, parent=None):
@@ -38,66 +53,66 @@ class GameMenu(QtWidgets.QWidget):
         self.startButton = QtWidgets.QPushButton('START')
         # ให้เรียกเมธอด start_new_game เพื่อรีเซ็ตสถานะเกมก่อนเปลี่ยนหน้า
         self.startButton.clicked.connect(self.start_new_game)
-        self.startButton.setStyleSheet("""
-            QPushButton {
+        self.startButton.setStyleSheet(f"""
+            QPushButton {{
                 background-color: rgba(216, 110, 14, 0);
                 color: #7f7b71;
                 border-radius: 2px;
                 font-size: 40px;
-                font-family: "Showcard Gothic";
+                font-family: '{Showcard_Gothic}';
                 padding: 2px;
-            }
-            QPushButton:hover {
+            }}
+            QPushButton:hover {{
                 background-color: rgba(216, 110, 14, 180);
                 color: #e1e8e4;
-            }
-            QPushButton:pressed {
+            }}
+            QPushButton:pressed {{
                 background-color: rgba(75, 53, 42, 255);
                 color: white;
-            }
+            }}
         """)
 
         self.howtoplayButton = QtWidgets.QPushButton('HOW TO PLAY')
         self.howtoplayButton.clicked.connect(lambda: self.stacked_widget.setCurrentIndex(1))
-        self.howtoplayButton.setStyleSheet("""
-            QPushButton {
+        self.howtoplayButton.setStyleSheet(f"""
+            QPushButton {{
                 background-color: rgba(216, 110, 14, 0);
                 color: #7f7b71;
                 border-radius: 2px;
                 font-size: 22px;
-                font-family: "Showcard Gothic";
+                font-family: '{Showcard_Gothic}';
                 padding: 8px;
-            }
-            QPushButton:hover {
+            }}
+            QPushButton:hover {{
                 background-color: rgba(216, 110, 14, 180);
                 color: #e1e8e4;
-            }
-            QPushButton:pressed {
+            }}
+            QPushButton:pressed {{
                 background-color: rgba(75, 53, 42, 255);
                 color: white;
-            }
+            }}
         """)
 
 
         self.exitButton = QtWidgets.QPushButton('EXIT')
         self.exitButton.clicked.connect(self.close_main_window)
-        self.exitButton.setStyleSheet("""
-            QPushButton {
+        self.exitButton.setStyleSheet(f"""
+            QPushButton {{
                 background-color: rgba(216, 110, 14, 0);
                 color: #7f7b71;
                 border-radius: 2px;
                 font-size: 28px;
-                font-family: "Showcard Gothic";
+                font-family: '{Showcard_Gothic}';
                 padding: 8px;
-            }
-            QPushButton:hover {
+            }}
+            QPushButton:hover {{
                 background-color: rgba(216, 110, 14, 180);
                 color: #e1e8e4;
-            }
-            QPushButton:pressed {
+            }}
+            QPushButton:pressed {{
                 background-color: rgba(75, 53, 42, 255);
                 color: white;
-            }
+            }}
         """)
 
 
@@ -668,14 +683,14 @@ class GamePage(QtWidgets.QWidget):
         self.score_label = QtWidgets.QLabel("0", self)
         self.score_label.setGeometry(10, 600, 80, 80) 
         self.score_label.setAlignment(QtCore.Qt.AlignCenter)
-        self.score_label.setStyleSheet("""
-            QLabel {
+        self.score_label.setStyleSheet(f"""
+            QLabel {{
                 color: white;
-                font-family: "Showcard Gothic"; 
+                font-family: '{Showcard_Gothic}'; 
                 font-size: 48px;
                 font-weight: bold;
                 text-shadow: 2px 2px 4px black;
-            }
+            }}
         """)
 
         # ====== ตัวเลขเวลาอยู่บนวงกลม ======
@@ -692,13 +707,13 @@ class GamePage(QtWidgets.QWidget):
         self.time_label = QtWidgets.QLabel(str(self.remaining_time), self)
         self.time_label.setGeometry(1105, 600, 80, 80)
         self.time_label.setAlignment(QtCore.Qt.AlignCenter)
-        self.time_label.setStyleSheet("""
-            QLabel {
+        self.time_label.setStyleSheet(f"""
+            QLabel {{
                 color: white;
-                font-family: "Showcard Gothic";
+                font-family: '{Showcard_Gothic}';
                 font-size: 48px;       /* เล็กหรือใหญ่ตามต้องการ */
                 font-weight: bold;
-            }
+            }}
         """)
 
         # Game clock
@@ -946,6 +961,20 @@ class GamePage(QtWidgets.QWidget):
         gw.station_plate_items = []
         gw.pot_icons = []
 
+        try:
+            poly_objs = cmds.ls(type="mesh", long=True)
+            if poly_objs:
+                transforms = list(set(cmds.listRelatives(poly_objs, parent=True, fullPath=True) or []))
+                if transforms:
+                    cmds.delete(transforms)
+                    print(f"✅ ลบ polygon ทั้งหมดแล้ว ({len(transforms)} ชิ้น)")
+                else:
+                    print("⚠️ ไม่มี transform ที่เกี่ยวข้องกับ mesh ให้ลบ")
+            else:
+                print("⚠️ ไม่พบ polygon objects ใน scene")
+        except Exception as e:
+            print("❌ Error while deleting polygons:", e)
+
         # regenerate orders
         try:
             files = os.listdir(os.path.join(os.path.dirname(__file__), "source_image", "image"))
@@ -1006,15 +1035,16 @@ class GamePage(QtWidgets.QWidget):
             lbl.setText(message)
             lbl.setWordWrap(True)
             lbl.setAlignment(QtCore.Qt.AlignCenter)
-            lbl.setStyleSheet("""
-                QLabel {
+            lbl.setStyleSheet(f"""
+                QLabel {{
+                    font-family: '{Showcard_Gothic}';
                     background-color: rgba(0,0,0,200);
                     color: #ffffff;
                     border: 2px solid white;
                     border-radius: 8px;
                     padding: 8px 12px;
                     font: bold 16px 'Arial';
-                }
+                }}
             """)
             lbl.setAttribute(QtCore.Qt.WA_TranslucentBackground)
             lbl.adjustSize()
