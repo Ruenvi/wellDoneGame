@@ -1,7 +1,7 @@
 import os
 from PySide6 import QtWidgets, QtCore, QtGui
+import maya.cmds as cmds
 
-# Try to import recipe data (authoritative). If missing, provide a sensible fallback
 try:
     from .recipe_data import RECIPE_DICT, SCORE_DICT  # type: ignore
 except Exception:
@@ -268,7 +268,7 @@ def drop_item(game_widget):
         if distance < 120:
             # 🔹 วางเหนือเขียงเล็กน้อย
             new_x = board_pos.x() + (board_geom.width() // 2) - 20
-            new_y = board_pos.y() - 45
+            new_y = board_pos.y()
             target_pos = QtCore.QPoint(new_x, new_y)
             placed = 'chopping_board'
 
@@ -630,7 +630,7 @@ def try_pickup_plate(game_widget):
     threshold = getattr(game_widget, 'pickup_threshold', 40)
 
     # 1️⃣ ตรวจว่าใกล้ plate_station หรือไม่
-    if hasattr(game_widget, 'plate_station') and is_near_object(game_widget.chef, game_widget.plate_station, mode='bounds'):
+    if hasattr(game_widget, 'plate_station') and is_near_object(game_widget.chef, game_widget.plate_station, mode='center'):
         if getattr(game_widget, 'has_plate', False):
             print('⚠️ มีจานอยู่แล้ว')
             return
@@ -645,7 +645,7 @@ def try_pickup_plate(game_widget):
         if os.path.exists(img_path):
             held_plate.setPixmap(QtGui.QPixmap(img_path))
         held_plate.setScaledContents(True)
-        held_plate.resize(64, 64)
+        held_plate.resize(50, 50)
         held_plate.setStyleSheet('background: transparent;')
         held_plate.show()
 
@@ -687,7 +687,7 @@ def try_pickup_plate(game_widget):
                 if os.path.exists(img_path):
                     held_plate.setPixmap(QtGui.QPixmap(img_path))
                 held_plate.setScaledContents(True)
-                held_plate.resize(64, 64)
+                held_plate.resize(50, 50)
                 held_plate.setStyleSheet('background: transparent;')
                 held_plate.show()
 
@@ -846,7 +846,7 @@ def drop_plate(game_widget):
     chef_y = game_widget.chef.y()
 
     dropped_label = QtWidgets.QLabel(game_widget)
-    dropped_label.setGeometry(chef_x + 40, chef_y + 40, 60, 60)
+    dropped_label.setGeometry(chef_x + 40, chef_y + 40, 50, 50)
     dropped_label.setStyleSheet('background: transparent;')
     dropped_label.show()
 
@@ -998,6 +998,7 @@ def try_serve_plate(game_widget, threshold=80):
         if in_orders:
             score = score_dict.get(meal_name, 0)
             print(f'✅ เสิร์ฟ {meal_name} ถูกต้อง +{score} คะแนน')
+            spawn_served_object(meal_name, spacing=3.0)
             # อัปเดต authoritative orders ถ้าเป็น GamePage
             if game_page is not None and hasattr(game_page, 'serve_dish_to_order'):
                 try:
@@ -1156,7 +1157,7 @@ def try_cook_pot(game_widget):
 
         # ตั้งค่าให้ QLabel รองรับการปรับขนาด
         soup_lbl.setScaledContents(True)
-        soup_lbl.resize(48, 48)
+        soup_lbl.resize(49, 57)
 
         # วางตรงกลางหม้อ และยกขึ้นเล็กน้อย
         soup_lbl.move(
@@ -1170,7 +1171,7 @@ def try_cook_pot(game_widget):
         print(f'🍲 ต้มเสร็จแล้ว: {soup_name} (created soup_icon)')
 
     # รอ 2 วินาทีแล้วค่อยทำซุป
-    QtCore.QTimer.singleShot(2000, cook_finish)
+    QtCore.QTimer.singleShot(4000, cook_finish)
     print('⏳ เริ่มต้มซุป... (2 วินาที)')
     return True
     game_widget.soup_icon = soup_lbl
@@ -1205,3 +1206,50 @@ def _can_move_to(self, new_x, new_y):
         if new_rect.intersects(obs.geometry()):
             return False
     return True
+
+def spawn_served_object(menu_name, spacing=3.0, row_spacing=3.0):
+
+    menu_to_object = {
+        "tomato_soup": "sphere",
+        "lettuce_salad": "cube",
+        "lettuce_tomato_salad": "cylinder",
+        "delux_salad": "cone"
+    }
+
+    menu_to_row = {
+        "tomato_soup": 0,
+        "lettuce_salad": 1,
+        "lettuce_tomato_salad": 2,
+        "delux_salad": 3
+    }
+
+    if menu_name not in menu_to_object:
+        cmds.warning(f"⚠️ ไม่มีเมนูชื่อ '{menu_name}' ในรายการ mapping.")
+        return
+
+    object_type = menu_to_object[menu_name]
+    row_index = menu_to_row.get(menu_name, 0)  # ถ้าไม่เจอให้เป็นแถวแรก
+
+    existing_objs = cmds.ls(f"{menu_name}_*")
+    next_index = len(existing_objs) + 1
+
+    obj_name = f"{menu_name}_{next_index}"
+
+    if object_type == "sphere":
+        obj = cmds.polySphere(name=obj_name)[0]
+    elif object_type == "cube":
+        obj = cmds.polyCube(name=obj_name)[0]
+    elif object_type == "cylinder":
+        obj = cmds.polyCylinder(name=obj_name)[0]
+    elif object_type == "cone":
+        obj = cmds.polyCone(name=obj_name)[0]
+    else:
+        cmds.warning(f"⚠️ ไม่รู้จัก object_type: {object_type}")
+        return
+
+    x_pos = (next_index - 1) * spacing
+    y_pos = row_index * row_spacing
+    cmds.move(x_pos, y_pos, 0, obj, absolute=True)
+
+    print(f"✅ Created {obj_name} ({object_type}) at X={x_pos}, Y={y_pos}")
+    return obj
