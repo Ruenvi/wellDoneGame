@@ -7,7 +7,6 @@ import time
 import random
 import maya.cmds as cmds
 
-# Support running as a package (relative import) or as a standalone script
 try:
     from . import wellDoneGameUtil as wdutil
 except Exception:
@@ -26,7 +25,6 @@ if os.path.exists(FONT_PATH):
         print("⚠️ ไม่สามารถโหลดฟอนต์ได้:", FONT_PATH)
         custom_font_family = None
     else:
-        # ดึงชื่อฟอนต์จากไฟล์ (เช่น "Showcard Gothic")
         Showcard_Gothic = QtGui.QFontDatabase.applicationFontFamilies(font_id)[0]
         print(f"✅ Loaded custom font: {Showcard_Gothic}")
 else:
@@ -51,7 +49,6 @@ class GameMenu(QtWidgets.QWidget):
         self.menuLayout.setContentsMargins(75, 90, 0, 0)
 
         self.startButton = QtWidgets.QPushButton('START')
-        # ให้เรียกเมธอด start_new_game เพื่อรีเซ็ตสถานะเกมก่อนเปลี่ยนหน้า
         self.startButton.clicked.connect(self.start_new_game)
         self.startButton.setStyleSheet(f"""
             QPushButton {{
@@ -123,8 +120,6 @@ class GameMenu(QtWidgets.QWidget):
         self.layout.addLayout(self.menuLayout)
 
     def start_new_game(self):
-        # 🔹 เปลี่ยนหน้าไป GamePage
-        # ใช้ self.stacked_widget (ไม่ใช่ stacked_widget ที่ไม่อยู่ใน scope)
         try:
             game_page = self.stacked_widget.widget(2)  # ดึง GamePage ออกมา
             if game_page is not None and hasattr(game_page, "restart_game"):
@@ -132,7 +127,6 @@ class GameMenu(QtWidgets.QWidget):
         except Exception as e:
             print("❌ Error restarting game:", e)
 
-        # สุดท้ายเปลี่ยนไปหน้าเกม
         try:
             self.stacked_widget.setCurrentIndex(2)
         except Exception:
@@ -196,7 +190,6 @@ class HowToPlayPage1(QtWidgets.QWidget):
         self.resizeEvent = self._on_resize
 
     def _on_resize(self, event=None):
-        """ให้พื้นหลังเต็มจอทุกครั้งที่ resize"""
         w, h = self.width(), self.height()
         self.bg_base.setGeometry(0, 0, w, h)
         self.bg.setGeometry(0, 0, w, h)
